@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Klaus Kode -- Claude Code with a better name
+
+# Find the Claude binary robustly (npm, Homebrew, direct install)
+CLAUDE_BIN="$(command -v claude)"
+if [ -z "$CLAUDE_BIN" ]; then
+  echo "Error: 'claude' not found in PATH. Install Claude Code first." >&2
+  exit 1
+fi
+CLAUDE_BIN="$(readlink -f "$CLAUDE_BIN" 2>/dev/null || realpath "$CLAUDE_BIN" 2>/dev/null)"
+
+CACHE_DIR="$HOME/.local/share/klaus-kode"
+PATCHED_BIN="$CACHE_DIR/klaus"
+VERSION_FILE="$CACHE_DIR/.source-version"
+
+mkdir -p "$CACHE_DIR"
+
+# Re-patch if source binary changed
+SOURCE_HASH=$(md5 -q "$CLAUDE_BIN" 2>/dev/null || md5sum "$CLAUDE_BIN" | cut -d' ' -f1)
+CACHED_HASH=$(cat "$VERSION_FILE" 2>/dev/null)
+
+if [ "$SOURCE_HASH" != "$CACHED_HASH" ]; then
+  # Binary-safe same-length replacement via Python bytes.replace()
+  # "Claude Code" = 11 bytes, "Klaus Kode " = 11 bytes (trailing space, invisible in output)
+  python3 -c "
+import sys
+with open(sys.argv[1], 'rb') as f:
+    data = f.read()
+# Step 1: Global cosmetic replacement
+data = data.replace(b'Claude Code', b'Klaus Kode ')
+# Step 2: Restore API-critical system prompt identifiers
+data = data.replace(
+    b\"Klaus Kode , Anthropic's official CLI for Claude\",
+    b\"Claude Code, Anthropic's official CLI for Claude\")
+with open(sys.argv[2], 'wb') as f:
+    f.write(data)
+" "$CLAUDE_BIN" "$PATCHED_BIN"
+  chmod +x "$PATCHED_BIN"
+
+  # Ad-hoc re-sign on macOS so Keychain sees same app
+  if [[ "$OSTYPE" == darwin* ]]; then
+    codesign --force --sign - --identifier com.anthropic.claude-code "$PATCHED_BIN" 2>/dev/null
+  fi
+
+  echo "$SOURCE_HASH" > "$VERSION_FILE"
+fi
+
+# Sync Keychain credentials (macOS only):
+# The patched binary looks for "Klaus Kode -credentials" but tokens are stored
+# under the original "Claude Code-credentials" service name
+if [[ "$OSTYPE" == darwin* ]]; then
+  ACCT="$(id -un)"
+  CLAUDE_SVC="Claude Code-credentials"
+  KLAUS_SVC="Klaus Kode -credentials"
+  CRED="$(security find-generic-password -a "$ACCT" -w -s "$CLAUDE_SVC" 2>/dev/null)"
+  if [ -n "$CRED" ]; then
+    security delete-generic-password -a "$ACCT" -s "$KLAUS_SVC" &>/dev/null
+    security add-generic-password -a "$ACCT" -s "$KLAUS_SVC" -w "$CRED" &>/dev/null
+  fi
+fi
+
+exec "$PATCHED_BIN" "$@"
