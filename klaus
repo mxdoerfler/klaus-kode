@@ -38,19 +38,25 @@ with open(sys.argv[2], 'wb') as f:
     codesign --force --sign - --identifier com.anthropic.claude-code "$PATCHED_BIN" 2>/dev/null
   fi
 
+  DID_REPATCH=true
 fi
 
 # Sync Keychain credentials (macOS only):
 # The patched binary looks for "Klaus Kode -credentials" but tokens are stored
-# under the original "Claude Code-credentials" service name
+# under the original "Claude Code-credentials" service name.
+# Skip the expensive full sync unless the binary was just repatched or
+# the Klaus credential entry is missing entirely (1 fast check vs 2-3 writes).
 if [[ "$OSTYPE" == darwin* ]]; then
   ACCT="$(id -un)"
   CLAUDE_SVC="Claude Code-credentials"
   KLAUS_SVC="Klaus Kode -credentials"
-  CRED="$(security find-generic-password -a "$ACCT" -w -s "$CLAUDE_SVC" 2>/dev/null)"
-  if [ -n "$CRED" ]; then
-    security delete-generic-password -a "$ACCT" -s "$KLAUS_SVC" &>/dev/null
-    security add-generic-password -a "$ACCT" -s "$KLAUS_SVC" -w "$CRED" &>/dev/null
+  if [ "$DID_REPATCH" = true ] || \
+     ! security find-generic-password -a "$ACCT" -s "$KLAUS_SVC" &>/dev/null; then
+    CRED="$(security find-generic-password -a "$ACCT" -w -s "$CLAUDE_SVC" 2>/dev/null)"
+    if [ -n "$CRED" ]; then
+      security delete-generic-password -a "$ACCT" -s "$KLAUS_SVC" &>/dev/null
+      security add-generic-password -a "$ACCT" -s "$KLAUS_SVC" -w "$CRED" &>/dev/null
+    fi
   fi
 fi
 
