@@ -24,13 +24,21 @@ mkdir -p "$INSTALL_DIR"
 curl -fsSL "$REPO/klaus" -o "$INSTALL_DIR/klaus"
 chmod +x "$INSTALL_DIR/klaus"
 
-# Check PATH
+# Ensure ~/.local/bin is in PATH
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-  echo ""
-  echo "Warning: $INSTALL_DIR is not in your PATH."
-  echo "Add this to your shell profile:"
-  echo "  export PATH=\"$INSTALL_DIR:\$PATH\""
-  echo ""
+  LINE="export PATH=\"\$HOME/.local/bin:\$PATH\""
+  SHELL_NAME="$(basename "$SHELL")"
+  case "$SHELL_NAME" in
+    zsh)  RC="$HOME/.zshrc" ;;
+    bash) RC="$HOME/.bashrc" ;;
+    *)    RC="$HOME/.profile" ;;
+  esac
+  if ! grep -qF '.local/bin' "$RC" 2>/dev/null; then
+    echo "" >> "$RC"
+    echo "$LINE" >> "$RC"
+    echo "Added $INSTALL_DIR to PATH in $RC"
+  fi
+  echo "Restart your terminal (or run 'source $RC') to use 'klaus'."
 fi
 
 # Verify
