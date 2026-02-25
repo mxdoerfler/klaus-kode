@@ -11,15 +11,11 @@ CLAUDE_BIN="$(readlink -f "$CLAUDE_BIN" 2>/dev/null || realpath "$CLAUDE_BIN" 2>
 
 CACHE_DIR="$HOME/.local/share/klaus-kode"
 PATCHED_BIN="$CACHE_DIR/klaus"
-VERSION_FILE="$CACHE_DIR/.source-version"
 
 mkdir -p "$CACHE_DIR"
 
-# Re-patch if source binary changed
-SOURCE_HASH=$(md5 -q "$CLAUDE_BIN" 2>/dev/null || md5sum "$CLAUDE_BIN" | cut -d' ' -f1)
-CACHED_HASH=$(cat "$VERSION_FILE" 2>/dev/null)
-
-if [ "$SOURCE_HASH" != "$CACHED_HASH" ]; then
+# Re-patch if source binary changed (mtime comparison, not MD5)
+if [ ! -f "$PATCHED_BIN" ] || [ "$CLAUDE_BIN" -nt "$PATCHED_BIN" ]; then
   # Binary-safe same-length replacement via Python bytes.replace()
   # "Claude Code" = 11 bytes, "Klaus Kode " = 11 bytes (trailing space, invisible in output)
   python3 -c "
@@ -42,7 +38,6 @@ with open(sys.argv[2], 'wb') as f:
     codesign --force --sign - --identifier com.anthropic.claude-code "$PATCHED_BIN" 2>/dev/null
   fi
 
-  echo "$SOURCE_HASH" > "$VERSION_FILE"
 fi
 
 # Sync Keychain credentials (macOS only):
