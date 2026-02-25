@@ -24,6 +24,12 @@ with open(sys.argv[1], 'rb') as f:
     data = f.read()
 # Step 1: Global cosmetic replacement
 data = data.replace(b'Claude Code', b'Klaus Kode ')
+# Step 1b: Replace subscription plan display names
+data = data.replace(b'return\"Claude Enterprise\"', b'return\"Klaus Enterprise \"')
+data = data.replace(b'return\"Claude Team\"', b'return\"Klaus Team \"')
+data = data.replace(b'return\"Claude Max\"', b'return\"Klaus Max \"')
+data = data.replace(b'return\"Claude Pro\"', b'return\"Klaus Pro \"')
+data = data.replace(b'return\"Claude API\"', b'return\"Klaus API \"')
 # Step 2: Restore API-critical system prompt identifiers
 data = data.replace(
     b\"Klaus Kode , Anthropic's official CLI for Claude\",
