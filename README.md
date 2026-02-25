@@ -1,6 +1,6 @@
 # Klaus Kode
 
-Claude Code, but its name is Klaus.
+Claude Code, but its Klaus.
 
 ## Prerequisites
 
@@ -32,3 +32,4 @@ MIT
 ---
 
 See [DETAILS.md](DETAILS.md) for how it works and how to uninstall.
+
